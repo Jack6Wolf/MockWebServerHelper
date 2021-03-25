@@ -1,0 +1,79 @@
+import groovy.io.FileType
+
+apply plugin: 'java'
+//apply plugin: 'nexus'
+//apply plugin: 'checkstyle'
+
+//task checkstyle(type: Checkstyle) {
+//    configFile = rootProject.file('checkstyle.xml')
+//    source 'src'
+//    include '**/*.java'
+//    exclude '**/gen/**'
+//
+//    classpath = files()
+//}
+//checkstyle {
+//    toolVersion = '7.2'
+//}
+
+compileJava {
+    sourceCompatibility = JavaVersion.VERSION_1_7
+    targetCompatibility = JavaVersion.VERSION_1_7
+}
+
+
+task copyTestResources(type: Copy, group: 'fixtures') {
+    from sourceSets.test.resources
+    into "${projectDir}/src/test/java"
+}
+
+task generateFixtures(dependsOn: copyTestResources, group: 'fixtures') {
+    def directory = projectDir.path + '/src/test/java'
+    new File(directory + '/fixtures').mkdir()
+    def path = directory + "/fixtures/Fixtures.java"
+
+    def builder = '' << ''
+    builder.append("package fixtures;\n\n")
+    builder.append("public class Fixtures {\n\n")
+    builder.append("  private Fixtures() {\n")
+    builder.append("    //no instance\n")
+    builder.append("  }\n\n")
+
+    def resources = sourceSets.test.resources.srcDirs.getAt(0)
+    if (resources != null) {
+        resources.eachDirMatch("fixtures") { dir ->
+            def fixturesFile = dir
+            fixturesFile.eachFile(FileType.FILES) { file ->
+                if (file.name.endsWith(".yaml")) {
+                    String fileName = file.name.split('\\.')[0]
+                    builder.append("  public static final String ")
+                            .append(fileName.toUpperCase())
+                            .append(" = ")
+                            .append('\"')
+                            .append(fileName)
+                            .append('\";\n')
+                }
+            }
+        }
+    }
+    builder.append("}\n")
+
+    new File(path).write(builder.toString())
+}
+
+compileTestJava.dependsOn generateFixtures
+
+dependencies {
+    implementation 'junit:junit:4.12'
+    implementation('com.squareup.okhttp3:mockwebserver:3.7.0') {
+        exclude group: "junit"
+    }
+    implementation('org.yaml:snakeyaml:1.15') {
+        transitive false
+    }
+
+    testImplementation 'org.assertj:assertj-core:2.4.0'
+    testImplementation "org.mockito:mockito-core:1.9.5"
+    testImplementation 'com.squareup.okhttp3:okhttp:3.7.0'
+}
+
